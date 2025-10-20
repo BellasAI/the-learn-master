@@ -6,6 +6,7 @@
  */
 
 import { createTrackedWatchUrl, extractVideoId } from './youtube-tracking';
+import { searchYouTubeVideos as searchYouTubeAPI } from './youtube-api';
 
 /**
  * Research and create a custom learning path
@@ -196,98 +197,32 @@ function estimateLearningTime(topic, level) {
 }
 
 /**
- * Search YouTube for relevant videos
- * In production, this would use YouTube Data API
+ * Search YouTube for relevant videos using REAL YouTube Data API
  */
 async function searchYouTubeVideos(topic, preferredChannels, analysis) {
-  console.log('🎥 Searching YouTube for videos...');
+  console.log('🎥 Searching YouTube for REAL videos...');
   
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // In production, this would make actual YouTube API calls
-  // For now, return structured mock data
-  
-  const mockVideos = [
-    {
-      id: 'dQw4w9WgXcQ',
-      title: `Complete Guide to ${topic}`,
-      channelName: 'Educational Channel',
-      channelId: 'UC-channel1',
-      duration: '15:30',
-      views: 125000,
-      publishedAt: '2024-06-15',
-      description: `Comprehensive introduction to ${topic}`,
-      thumbnail: 'https://i.ytimg.com/vi/placeholder/mqdefault.jpg',
-      relevanceScore: 0.95,
-      tags: analysis.keyConcepts
-    },
-    {
-      id: 'jNQXAC9IVRw',
-      title: `${topic} - Detailed Explanation`,
-      channelName: 'Expert Tutorials',
-      channelId: 'UC-channel2',
-      duration: '22:45',
-      views: 89000,
-      publishedAt: '2024-08-20',
-      description: `Deep dive into ${topic}`,
-      thumbnail: 'https://i.ytimg.com/vi/placeholder/mqdefault.jpg',
-      relevanceScore: 0.88,
-      tags: analysis.keyConcepts
-    },
-    {
-      id: '9bZkp7q19f0',
-      title: `Understanding ${topic} - Beginner Friendly`,
-      channelName: 'Learn With Us',
-      channelId: 'UC-channel3',
-      duration: '18:15',
-      views: 67000,
-      publishedAt: '2024-09-10',
-      description: `Easy to understand guide for ${topic}`,
-      thumbnail: 'https://i.ytimg.com/vi/placeholder/mqdefault.jpg',
-      relevanceScore: 0.82,
-      tags: analysis.keyConcepts
-    },
-    {
-      id: 'video4',
-      title: `${topic} - Advanced Concepts`,
-      channelName: 'Pro Academy',
-      channelId: 'UC-channel4',
-      duration: '25:30',
-      views: 45000,
-      publishedAt: '2024-07-05',
-      description: `Advanced techniques for ${topic}`,
-      thumbnail: 'https://i.ytimg.com/vi/placeholder/mqdefault.jpg',
-      relevanceScore: 0.75,
-      tags: analysis.keyConcepts
-    },
-    {
-      id: 'video5',
-      title: `Practical ${topic} Tutorial`,
-      channelName: 'Hands-On Learning',
-      channelId: 'UC-channel5',
-      duration: '30:00',
-      views: 92000,
-      publishedAt: '2024-05-20',
-      description: `Hands-on practical guide to ${topic}`,
-      thumbnail: 'https://i.ytimg.com/vi/placeholder/mqdefault.jpg',
-      relevanceScore: 0.78,
-      tags: analysis.keyConcepts
-    }
-  ];
-
-  // Boost scores for preferred channels
-  if (preferredChannels) {
-    const channelList = preferredChannels.toLowerCase().split(',').map(c => c.trim());
-    mockVideos.forEach(video => {
-      if (channelList.some(ch => video.channelName.toLowerCase().includes(ch))) {
-        video.relevanceScore += 0.1;
-        video.preferredChannel = true;
-      }
+  try {
+    // Use real YouTube API
+    const videos = await searchYouTubeAPI(topic, {
+      maxResults: 25,
+      preferredChannels: preferredChannels,
+      level: analysis.difficulty,
+      videoDuration: 'medium'
     });
-  }
 
-  return mockVideos;
+    if (!videos || videos.length === 0) {
+      console.error('❌ No videos found for topic:', topic);
+      throw new Error('No educational videos found for this topic. Please try a different search term.');
+    }
+
+    console.log(`✅ Found ${videos.length} real educational videos`);
+    return videos;
+
+  } catch (error) {
+    console.error('❌ YouTube search failed:', error);
+    throw new Error('Failed to search YouTube: ' + error.message + '. Please check your YouTube API configuration.');
+  }
 }
 
 /**

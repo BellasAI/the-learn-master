@@ -1,0 +1,11 @@
+{
+  "name": "the-learn-master",
+  "version": "2.0.0",
+  "description": "The Learn Master - Master Any Topic, Anywhere",
+  "buildDir": "dist",
+  "type": "static",
+  "routes": {
+    "/*": "index.html"
+  }
+}
+
