@@ -1,9 +1,13 @@
 /**
- * YouTube Data API Integration
+ * YouTube Search Integration
  * 
- * This module connects to the real YouTube Data API to search for
- * educational videos instead of using mock data.
+ * This module provides multiple methods to search YouTube:
+ * 1. Hybrid Search (RSS + OpenAI) - Works without YouTube API key!
+ * 2. YouTube Data API v3 - Best quality, requires API key
+ * 3. Fallback methods - When all else fails
  */
+
+import { searchYouTubeHybrid } from './youtube-search-hybrid';
 
 const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
@@ -23,17 +27,33 @@ export async function searchYouTubeVideos(topic, options = {}) {
     level = 'beginner'
   } = options;
 
-  // Build search query
-  const searchQuery = buildSearchQuery(topic, level);
-  
-  console.log('🔍 Searching YouTube for:', searchQuery);
+  console.log('🔍 Searching YouTube for:', topic);
 
   try {
-    // Check if API key is configured
-    if (!YOUTUBE_API_KEY) {
-      console.warn('⚠️ YouTube API key not configured, using fallback');
-      return await fallbackSearch(topic, options);
+    // Method 1: Try Hybrid Search first (RSS + OpenAI - works without YouTube API!)
+    console.log('🤖 Attempting hybrid search (RSS + AI)...');
+    try {
+      const hybridResults = await searchYouTubeHybrid(topic, options);
+      if (hybridResults && hybridResults.length > 0) {
+        console.log(`✅ Hybrid search successful: ${hybridResults.length} videos`);
+        return hybridResults;
+      }
+    } catch (hybridError) {
+      console.warn('⚠️ Hybrid search failed:', hybridError.message);
     }
+
+    // Method 2: Try YouTube Data API (if key is configured)
+    if (!YOUTUBE_API_KEY) {
+      console.warn('⚠️ YouTube API key not configured');
+      console.warn('⚠️ Hybrid search also failed');
+      throw new Error('Unable to search YouTube. Please configure YouTube API key or check your internet connection.');
+    }
+
+    // Build search query
+    const searchQuery = buildSearchQuery(topic, level);
+    console.log('🔑 Using YouTube Data API...');
+
+    // Continue with YouTube API search...
 
     // Search for videos
     const searchUrl = `${YOUTUBE_API_BASE}/search?` + new URLSearchParams({
