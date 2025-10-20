@@ -49,8 +49,8 @@ export async function searchYouTubeVideos(topic, options = {}) {
       throw new Error('Unable to search YouTube. Please configure YouTube API key or check your internet connection.');
     }
 
-    // Build search query
-    const searchQuery = buildSearchQuery(topic, level);
+    // Build search query with additional keywords from options
+    const searchQuery = buildSearchQuery(topic, level, options.additionalKeywords);
     console.log('🔑 Using YouTube Data API...');
 
     // Continue with YouTube API search...
@@ -138,25 +138,28 @@ export async function searchYouTubeVideos(topic, options = {}) {
 }
 
 /**
- * Build optimized search query based on topic and level
- * Now much more specific to user's exact request
+ * Build search query with educational modifiers
+ * Now accepts additional keywords for more specific searches
  */
-function buildSearchQuery(topic, level) {
-  // Keep the topic VERY specific - don't dilute it
-  // Only add minimal modifiers to ensure educational content
-  
+function buildSearchQuery(topic, level, additionalKeywords = []) {
   const levelModifiers = {
     'beginner': 'tutorial',
-    'intermediate': 'course',
+    'intermediate': 'explained',
     'advanced': 'advanced'
   };
 
   const modifier = levelModifiers[level] || 'tutorial';
   
+  // If we have additional keywords (from description), include them
+  // This makes "gardening" + ["fruit growing"] become "fruit growing tutorial"
+  if (additionalKeywords && additionalKeywords.length > 0) {
+    const keywords = additionalKeywords.join(' ');
+    return `${keywords} ${modifier}`;
+  }
+  
   // Use the EXACT topic with minimal modification
   // This ensures "neural networks" stays "neural networks", not "AI"
-  return `${topic} ${modifier}`;
-}
+  return `${topic} ${modifier}`;}
 
 /**
  * Calculate relevance score for a video

@@ -21,14 +21,20 @@ export async function searchYouTubeHybrid(topic, options = {}) {
   const {
     maxResults = 15,
     level = 'beginner',
-    preferredChannels = ''
+    preferredChannels = '',
+    additionalKeywords = []
   } = options;
 
-  console.log('🔍 Hybrid search for:', topic);
+  // Use the most specific search term available
+  const searchTerm = (additionalKeywords && additionalKeywords.length > 0) 
+    ? additionalKeywords[0] 
+    : topic;
+
+  console.log('🔍 Hybrid search for:', searchTerm, additionalKeywords.length > 0 ? `(refined from "${topic}")` : '');
 
   try {
     // Step 1: Get videos from YouTube RSS (no API key needed!)
-    const rssVideos = await searchYouTubeRSS(topic, maxResults);
+    const rssVideos = await searchYouTubeRSS(searchTerm, maxResults);
     
     if (rssVideos.length === 0) {
       throw new Error('No videos found via RSS feed');
@@ -37,7 +43,8 @@ export async function searchYouTubeHybrid(topic, options = {}) {
     console.log(`📺 Found ${rssVideos.length} videos from RSS`);
 
     // Step 2: Use OpenAI to analyze and filter educational content
-    const analyzedVideos = await analyzeVideosWithAI(rssVideos, topic, level);
+    // Use the specific search term for more accurate filtering
+    const analyzedVideos = await analyzeVideosWithAI(rssVideos, searchTerm, level);
 
     // Step 3: Boost preferred channels
     if (preferredChannels) {

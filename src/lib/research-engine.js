@@ -100,15 +100,25 @@ async function analyzeTopicWithAI(topic, description, level) {
 
 /**
  * Extract key concepts from topic and description
+ * Now prioritizes description for more specific searches
  */
 function extractKeyConcepts(topic, description) {
-  // This would use NLP in production
   const concepts = [];
+  const topicLower = topic.toLowerCase();
+  const descLower = description ? description.toLowerCase() : '';
+  
+  // PRIORITY: If description contains specific subtopics, extract them
+  // Example: topic="gardening", description="fruit growing" → prioritize "fruit growing"
+  if (descLower) {
+    // Extract specific nouns and phrases from description
+    const specificTerms = extractSpecificTerms(descLower);
+    if (specificTerms.length > 0) {
+      // These are the MOST specific concepts - add them first
+      concepts.push(...specificTerms);
+    }
+  }
   
   // Parse topic for specific terms
-  const topicLower = topic.toLowerCase();
-  
-  // Example: "mating cycle of bees in the UK"
   if (topicLower.includes('mating') || topicLower.includes('reproduction')) {
     concepts.push('Reproductive Biology');
   }
@@ -122,12 +132,56 @@ function extractKeyConcepts(topic, description) {
     concepts.push('UK Species', 'Regional Variations');
   }
 
-  // Add general concepts based on description
-  if (description.toLowerCase().includes('beginner')) {
-    concepts.unshift('Introduction to ' + topic);
+  // Add general topic only if no specific concepts found
+  if (concepts.length === 0) {
+    concepts.push(topic);
   }
 
-  return concepts.length > 0 ? concepts : ['Introduction', 'Fundamentals', 'Advanced Topics'];
+  return concepts;
+}
+
+/**
+ * Extract specific terms from description
+ * Helps identify subtopics within a broader topic
+ */
+function extractSpecificTerms(description) {
+  const terms = [];
+  
+  // Common patterns for specific subtopics
+  const patterns = [
+    /\b(\w+\s+growing)\b/g,  // "fruit growing", "vegetable growing"
+    /\b(growing\s+\w+)\b/g,  // "growing tomatoes", "growing apples"
+    /\b(\w+\s+cultivation)\b/g,  // "fruit cultivation"
+    /\b(\w+\s+farming)\b/g,  // "fruit farming"
+    /\b(\w+\s+gardening)\b/g,  // "container gardening", "organic gardening"
+    /\b(\w+\s+training)\b/g,  // "neural network training"
+    /\b(\w+\s+development)\b/g,  // "web development"
+    /\b(\w+\s+programming)\b/g,  // "Python programming"
+    /\b(\w+\s+design)\b/g,  // "UI design"
+    /\b(\w+\s+architecture)\b/g,  // "software architecture"
+  ];
+  
+  patterns.forEach(pattern => {
+    const matches = description.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        const cleaned = match.trim();
+        if (cleaned.length > 3 && !terms.includes(cleaned)) {
+          terms.push(cleaned);
+        }
+      });
+    }
+  });
+  
+  // Also extract capitalized phrases (likely specific topics)
+  const capitalizedPhrases = description.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) || [];
+  capitalizedPhrases.forEach(phrase => {
+    if (phrase.length > 3 && !terms.includes(phrase.toLowerCase())) {
+      terms.push(phrase.toLowerCase());
+    }
+  });
+  
+  return terms;
 }
 
 /**
@@ -203,12 +257,23 @@ async function searchYouTubeVideos(topic, preferredChannels, analysis) {
   console.log('🎥 Searching YouTube for REAL videos...');
   
   try {
-    // Use real YouTube API
-    const videos = await searchYouTubeAPI(topic, {
+    // Build the most specific search query
+    // If we have specific concepts from description, use those instead of general topic
+    let searchQuery = topic;
+    
+    if (analysis.keyConcepts && analysis.keyConcepts.length > 0) {
+      // Use the FIRST (most specific) concept as the search query
+      searchQuery = analysis.keyConcepts[0];
+      console.log(`🎯 Using specific search query: "${searchQuery}" (from concepts)`);
+    }
+    
+    // Use real YouTube API with the refined search query
+    const videos = await searchYouTubeAPI(searchQuery, {
       maxResults: 25,
       preferredChannels: preferredChannels,
       level: analysis.difficulty,
-      videoDuration: 'medium'
+      videoDuration: 'medium',
+      additionalKeywords: analysis.keyConcepts.slice(1, 3)
     });
 
     if (!videos || videos.length === 0) {
