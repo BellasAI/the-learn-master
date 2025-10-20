@@ -139,32 +139,54 @@ export async function searchYouTubeVideos(topic, options = {}) {
 
 /**
  * Build optimized search query based on topic and level
+ * Now much more specific to user's exact request
  */
 function buildSearchQuery(topic, level) {
+  // Keep the topic VERY specific - don't dilute it
+  // Only add minimal modifiers to ensure educational content
+  
   const levelModifiers = {
-    'beginner': 'tutorial introduction explained',
-    'intermediate': 'guide course',
-    'advanced': 'advanced deep dive masterclass'
+    'beginner': 'tutorial',
+    'intermediate': 'course',
+    'advanced': 'advanced'
   };
 
   const modifier = levelModifiers[level] || 'tutorial';
   
-  // Add educational keywords to improve results
-  return `${topic} ${modifier} educational`;
+  // Use the EXACT topic with minimal modification
+  // This ensures "neural networks" stays "neural networks", not "AI"
+  return `${topic} ${modifier}`;
 }
 
 /**
  * Calculate relevance score for a video
  */
 function calculateRelevanceScore(video, topic, level) {
-  let score = 0.5; // Base score
+  let score = 0.3; // Lower base score - must earn relevance
 
   const titleLower = video.snippet.title.toLowerCase();
   const topicLower = topic.toLowerCase();
   const descLower = video.snippet.description.toLowerCase();
 
-  // Title contains topic
-  if (titleLower.includes(topicLower)) score += 0.2;
+  // CRITICAL: Title MUST contain the specific topic or key terms
+  // Split topic into key terms (e.g., "neural networks" -> ["neural", "networks"])
+  const topicTerms = topicLower.split(' ').filter(term => term.length > 3);
+  
+  // Check if title contains the EXACT topic phrase
+  if (titleLower.includes(topicLower)) {
+    score += 0.4; // Big boost for exact match
+  } else {
+    // Check if title contains most key terms
+    const termsInTitle = topicTerms.filter(term => titleLower.includes(term));
+    if (termsInTitle.length >= topicTerms.length * 0.7) {
+      score += 0.25; // Decent boost for partial match
+    } else if (termsInTitle.length > 0) {
+      score += 0.1; // Small boost for some terms
+    } else {
+      // No key terms found - heavily penalize
+      score -= 0.3;
+    }
+  }
 
   // Title contains educational keywords
   const eduKeywords = ['tutorial', 'guide', 'explained', 'course', 'learn', 'introduction'];
@@ -175,8 +197,12 @@ function calculateRelevanceScore(video, topic, level) {
   if (level === 'intermediate' && titleLower.includes('intermediate')) score += 0.1;
   if (level === 'advanced' && titleLower.includes('advanced')) score += 0.1;
 
-  // Description relevance
-  if (descLower.includes(topicLower)) score += 0.1;
+  // Description relevance (less important than title)
+  if (descLower.includes(topicLower)) score += 0.15;
+  else {
+    const termsInDesc = topicTerms.filter(term => descLower.includes(term));
+    if (termsInDesc.length >= topicTerms.length * 0.5) score += 0.08;
+  }
 
   // High engagement (quality indicator)
   const views = parseInt(video.statistics.viewCount);
@@ -198,20 +224,32 @@ function calculateRelevanceScore(video, topic, level) {
 
 /**
  * Check if video is educational content
+ * Now much stricter about topic relevance
  */
 function isEducationalContent(video, topic) {
   const title = video.title.toLowerCase();
   const description = video.description.toLowerCase();
   const topicLower = topic.toLowerCase();
 
-  // Must be related to topic
-  if (!title.includes(topicLower) && !description.includes(topicLower)) {
-    // Check for partial matches
-    const topicWords = topicLower.split(' ');
-    const hasPartialMatch = topicWords.some(word => 
-      word.length > 3 && (title.includes(word) || description.includes(word))
-    );
-    if (!hasPartialMatch) return false;
+  // STRICT: Must be related to the SPECIFIC topic
+  const topicTerms = topicLower.split(' ').filter(term => term.length > 3);
+  
+  // Check if title contains the exact topic or most key terms
+  if (title.includes(topicLower)) {
+    // Exact match - good!
+  } else {
+    // Check for key terms
+    const termsInTitle = topicTerms.filter(term => title.includes(term));
+    const termsInDesc = topicTerms.filter(term => description.includes(term));
+    
+    // Must have at least 70% of key terms in title OR description
+    const titleMatch = termsInTitle.length >= topicTerms.length * 0.7;
+    const descMatch = termsInDesc.length >= topicTerms.length * 0.7;
+    
+    if (!titleMatch && !descMatch) {
+      // Not specific enough to the topic
+      return false;
+    }
   }
 
   // Filter out obvious non-educational content

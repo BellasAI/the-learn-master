@@ -66,10 +66,11 @@ export async function searchYouTubeHybrid(topic, options = {}) {
  * Search YouTube RSS feeds (no API key needed!)
  */
 async function searchYouTubeRSS(topic, maxResults) {
+  // Use SPECIFIC search queries that maintain the exact topic
   const searches = [
     `${topic} tutorial`,
+    `${topic} course`,
     `${topic} explained`,
-    `${topic} guide`,
     `learn ${topic}`
   ];
 
@@ -170,10 +171,15 @@ async function analyzeVideosWithAI(videos, topic, level) {
       `${i + 1}. "${v.title}" by ${v.channelName}\n   Description: ${v.description.substring(0, 200)}...`
     ).join('\n\n');
 
-    const prompt = `You are an educational content curator. Analyze these YouTube videos for the topic "${topic}" at ${level} level.
+    const prompt = `You are an educational content curator. Analyze these YouTube videos for the SPECIFIC topic "${topic}" at ${level} level.
+
+IMPORTANT: Be VERY strict about topic specificity!
+- If the topic is "neural networks", only include videos specifically about neural networks
+- Reject general "AI" or "machine learning" videos unless they focus on neural networks
+- The video title and description MUST match the exact topic requested
 
 For each video, provide:
-1. Relevance score (0.0 to 1.0) - how relevant is it to "${topic}"?
+1. Relevance score (0.0 to 1.0) - how SPECIFICALLY relevant is it to "${topic}"?
 2. Educational value (0.0 to 1.0) - is it actually educational content?
 3. Level appropriateness (0.0 to 1.0) - is it suitable for ${level} learners?
 
@@ -192,9 +198,10 @@ Filter out:
 - Music videos
 - Vlogs or personal content
 - Pranks or entertainment
-- Unrelated content
+- Videos that are too general (e.g., general AI when topic is neural networks)
+- Videos that don't specifically address "${topic}"
 
-Only include videos that are genuinely educational about "${topic}".`;
+Only include videos that are genuinely educational and SPECIFICALLY about "${topic}".`;
 
     const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
       method: 'POST',
