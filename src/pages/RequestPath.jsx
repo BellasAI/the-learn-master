@@ -24,6 +24,9 @@ import {
 } from 'lucide-react'
 import Navigation from '../components/Navigation'
 import { researchLearningPath, getResearchPreview } from '../lib/research-engine'
+import { screenUserRequest } from '../lib/content-safety'
+import { verifyLearningPath, generateVerificationSummary } from '../lib/quality-verification'
+import DisclaimerModal, { BlockedContentModal, QualityVerificationModal } from '../components/DisclaimerModal'
 
 export default function RequestPath({ user, onLogout }) {
   const [formData, setFormData] = useState({
@@ -38,6 +41,11 @@ export default function RequestPath({ user, onLogout }) {
   const [submitted, setSubmitted] = useState(false)
   const [researchResult, setResearchResult] = useState(null)
   const [preview, setPreview] = useState(null)
+  const [safetyCheck, setSafetyCheck] = useState(null)
+  const [showDisclaimer, setShowDisclaimer] = useState(false)
+  const [showBlocked, setShowBlocked] = useState(false)
+  const [showQualityVerification, setShowQualityVerification] = useState(false)
+  const [qualityVerification, setQualityVerification] = useState(null)
 
   // Tier configuration
   const tierLimits = {
@@ -119,7 +127,45 @@ export default function RequestPath({ user, onLogout }) {
     
     setIsSubmitting(true)
     setResearchProgress(0)
-    setResearchStage('Analyzing your request...')
+    setResearchStage('Checking content safety...')
+    
+    try {
+      // STEP 1: Safety screening
+      const safety = await screenUserRequest(
+        formData.topic,
+        formData.description,
+        user?.age || null
+      )
+      
+      setSafetyCheck(safety)
+      
+      // If blocked, show blocked modal
+      if (!safety.allowed) {
+        setShowBlocked(true)
+        setIsSubmitting(false)
+        return
+      }
+      
+      // If requires disclaimer, show disclaimer modal
+      if (safety.requiresDisclaimer) {
+        setShowDisclaimer(true)
+        setIsSubmitting(false)
+        return
+      }
+      
+      // Continue with research
+      await proceedWithResearch()
+      
+    } catch (error) {
+      console.error('Safety check error:', error)
+      // Fail open - allow research to continue
+      await proceedWithResearch()
+    }
+  }
+  
+  const proceedWithResearch = async () => {
+    setIsSubmitting(true)
+    setResearchProgress(0)
     
     try {
       // Simulate research progress
@@ -144,8 +190,25 @@ export default function RequestPath({ user, onLogout }) {
         tier: currentTier
       })
 
-      setResearchResult(result)
-      setSubmitted(true)
+      // STEP 2: Quality verification
+      setResearchStage('Verifying learning path quality...')
+      const verification = await verifyLearningPath(result, formData)
+      const verificationSummary = generateVerificationSummary(verification, formData)
+      
+      setQualityVerification({
+        ...verification,
+        summary: verificationSummary
+      })
+      
+      // If quality is good, show results
+      if (verification.ready && verification.confidence > 0.7) {
+        setResearchResult(result)
+        setSubmitted(true)
+      } else {
+        // Show quality verification modal for user decision
+        setResearchResult(result)
+        setShowQualityVerification(true)
+      }
       
     } catch (error) {
       console.error('Research error:', error)
@@ -697,6 +760,52 @@ export default function RequestPath({ user, onLogout }) {
           </div>
         </div>
       </div>
+      
+      {/* Safety and Quality Modals */}
+      {showDisclaimer && safetyCheck && (
+        <DisclaimerModal
+          disclaimerType={safetyCheck.disclaimerType}
+          topic={formData.topic}
+          onAccept={async () => {
+            setShowDisclaimer(false)
+            await proceedWithResearch()
+          }}
+          onDecline={() => {
+            setShowDisclaimer(false)
+            setIsSubmitting(false)
+          }}
+          requiresAcceptance={safetyCheck.severity === 'critical' || safetyCheck.severity === 'high'}
+        />
+      )}
+      
+      {showBlocked && safetyCheck && (
+        <BlockedContentModal
+          reason={safetyCheck.reason}
+          category={safetyCheck.category}
+          message={safetyCheck.message}
+          alternatives={safetyCheck.alternatives}
+          onClose={() => {
+            setShowBlocked(false)
+            setIsSubmitting(false)
+          }}
+        />
+      )}
+      
+      {showQualityVerification && qualityVerification && (
+        <QualityVerificationModal
+          verification={qualityVerification}
+          originalRequest={formData}
+          onProceed={() => {
+            setShowQualityVerification(false)
+            setSubmitted(true)
+          }}
+          onRefine={() => {
+            setShowQualityVerification(false)
+            setIsSubmitting(false)
+            // User can modify their request
+          }}
+        />
+      )}
     </div>
   )
 }
